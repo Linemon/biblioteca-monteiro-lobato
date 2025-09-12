@@ -1,0 +1,4 @@
+.github/
+.vs/
+src/WebApi/bin
+src/WebApi/obj
