@@ -1,15 +1,25 @@
-﻿using System.Text.Json.Serialization;
-
-namespace WebApi.Models;
+﻿namespace WebApi.Models;
 
 public class User : TrackableEntity
 {
-    private string _name = null!;
-    public string Name 
-    { 
-        get => _name; 
-        init => _name = value; 
+    public string Name { get; private set; } = null!;
+    public string Email { get; private set; } = null!;
+    public string Phone { get; private set; } = null!;
+
+    protected User() { }
+
+    public User(string name, string email, string phone)
+    {
+        Name = name;
+        Email = email;
+        Phone = phone;
     }
-    public string Email { get; init; } = null!;
-    public string PasswordHash { get; init; } = null!;
+
+    public void Update(User userData)
+    {
+        Name = userData.Name ?? Name;
+        Email = userData.Email ?? Email;
+        Phone = userData.Phone ?? Phone;
+        SetUpdateAt(DateTime.UtcNow);
+    }
 }
