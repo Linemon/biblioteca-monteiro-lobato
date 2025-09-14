@@ -41,6 +41,7 @@ export default {
     const currentScreen = ref('login')
     const selectedBookId = ref(undefined)
     const selectedReaderId = ref(undefined)
+    const currentUser = ref(null)
 
     const handleNavigation = (screen, bookId, readerId) => {
       currentScreen.value = screen
@@ -48,7 +49,8 @@ export default {
       selectedReaderId.value = readerId
     }
 
-    const handleLogin = () => {
+    const handleLogin = (user) => {
+      currentUser.value = user
       currentScreen.value = 'dashboard'
     }
 
@@ -72,6 +74,7 @@ export default {
       currentComponent,
       selectedBookId,
       selectedReaderId,
+      currentUser,
       handleNavigation,
       handleLogin
     }

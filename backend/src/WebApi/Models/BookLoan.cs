@@ -56,7 +56,6 @@ public class BookLoan : TrackableEntity
 
     public void NotifyDelayedReturn()
     {
-        // TODO: implement
         throw new NotImplementedException();
     }
 }

@@ -19,7 +19,7 @@ namespace WebApi.Migrations
                     "Admin User",
                     "admin@example.com",
                     "11999999999",
-                    "SUPERSECRET@123",
+                    "admin123",
                     DateTime.UtcNow,
                     DateTime.UtcNow
                 }
@@ -30,7 +30,7 @@ namespace WebApi.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DeleteData(
-                table: "Users",
+                table: "Employees",
                 keyColumn: "Id",
                 keyValue: "00000000-0000-0000-0000-000000000000"
             );

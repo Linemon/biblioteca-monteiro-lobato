@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<BookLoan> BookLoans { get; set; }
     public DbSet<Employee> Employees { get; set; }
     public DbSet<Reader> Readers { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,5 +30,11 @@ public class AppDbContext : DbContext
             .HasOne(bl => bl.Employee)
             .WithMany(e => e.RegisteredBookLoans)
             .HasForeignKey(bl => bl.EmployeeId);
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(rt => rt.Employee)
+            .WithMany()
+            .HasForeignKey(rt => rt.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

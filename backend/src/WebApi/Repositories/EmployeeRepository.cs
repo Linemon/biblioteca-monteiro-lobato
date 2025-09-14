@@ -14,4 +14,12 @@ public class EmployeeRepository(AppDbContext context)
             .AsNoTracking()
             .SingleOrDefault();
     }
+
+    public Employee? GetByEmail(string email)
+    {
+        return context.Employees
+            .Where(x => x.Email == email)
+            .AsNoTracking()
+            .SingleOrDefault();
+    }
 }

@@ -17,6 +17,8 @@ public class Employee : User
         set => _passwordHash = value;
     }
 
+    public string Password => PasswordHash;
+
     private Employee() { }
 
     public Employee(string name, string email, string phone, string passwordHash)
@@ -77,7 +79,6 @@ public class Employee : User
 
     public void SendBookDelayReturnNotification(Reader reader)
     {
-        // TODO: implement
         throw new NotImplementedException();
     }
 

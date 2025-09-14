@@ -1,92 +1,139 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using WebApi.Context;
 using WebApi.Models;
 using WebApi.Repositories;
 
 namespace WebApi.Controllers;
 
-// TODO: autenticação admin
 [ApiController]
 [Route("api/v1/readers")]
+[Authorize]
 public class ReadersController(AppDbContext context) : ControllerBase
 {
-    private const string _employeeId = "00000000-0000-0000-0000-000000000000";
     private EmployeeRepository _employeeRepository = new(context);
+
+    private Guid GetCurrentEmployeeId()
+    {
+        var employeeIdClaim = User.FindFirst("employee_id")?.Value;
+        if (string.IsNullOrEmpty(employeeIdClaim) || !Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            throw new UnauthorizedAccessException("Token inválido ou funcionário não encontrado.");
+        }
+        return employeeId;
+    }
 
     [HttpGet]
     public ActionResult<IEnumerable<object>> GetAll()
     {
-        var employee = _employeeRepository.GetById(Guid.Parse(_employeeId));
-
-        if (employee is null)
+        try
         {
-            return Forbid("Employee not found");
+            var employeeId = GetCurrentEmployeeId();
+            var employee = _employeeRepository.GetById(employeeId);
+
+            if (employee is null)
+            {
+                return Forbid("Employee not found");
+            }
+
+            employee.GivePermissions(context);
+
+            var readers = employee.GetReaders();
+            return Ok(readers.Select(x => new { x.Id, x.CreatedAt }));
         }
-
-        employee.GivePermissions(context);
-
-        var readers = employee.GetReaders();
-        return Ok(readers.Select(x => new { x.Id, x.CreatedAt }));
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized("Token inválido ou funcionário não encontrado.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "Erro interno do servidor.");
+        }
     }
 
     [HttpGet("{id}")]
     public ActionResult<object> GetById(Guid id)
     {
-        var employee = _employeeRepository.GetById(Guid.Parse(_employeeId));
-
-        if (employee is null)
-        {
-            return Forbid("Employee not found");
-        }
-
-        employee.GivePermissions(context);
-
         try
         {
-            var reader = employee.GetReaderById(id);
+            var employeeId = GetCurrentEmployeeId();
+            var employee = _employeeRepository.GetById(employeeId);
 
-            return Ok(new
+            if (employee is null)
             {
-                reader.Name,
-                reader.Email,
-                reader.Phone,
-                reader.CreatedAt,
-                reader.UpdatedAt
-            });
+                return Forbid("Employee not found");
+            }
+
+            employee.GivePermissions(context);
+
+            try
+            {
+                var reader = employee.GetReaderById(id);
+
+                return Ok(new
+                {
+                    reader.Name,
+                    reader.Email,
+                    reader.Phone,
+                    status = (int)reader.Status,
+                    reader.CreatedAt,
+                    reader.UpdatedAt
+                });
+            }
+            catch (Exception ex) when (ex.Message == "NotFound")
+            {
+                return NotFound("Reader not found.");
+            }
         }
-        catch (Exception ex) when (ex.Message == "NotFound")
+        catch (UnauthorizedAccessException)
         {
-            return NotFound("Reader not found.");
+            return Unauthorized("Token inválido ou funcionário não encontrado.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "Erro interno do servidor.");
         }
     }
 
     [HttpPost]
     public ActionResult Create(Reader reader)
     {
-        var employee = _employeeRepository.GetById(Guid.Parse(_employeeId));
-
-        if (employee is null)
-        {
-            return Forbid("Employee not found");
-        }
-
-        employee.GivePermissions(context);
-
-        if (reader is null)
-        {
-            return BadRequest();
-        }
-
         try
         {
-            employee.RegisterReader(reader);
-            context.SaveChanges();
+            var employeeId = GetCurrentEmployeeId();
+            var employee = _employeeRepository.GetById(employeeId);
 
-            return CreatedAtAction(nameof(GetById), new { id = reader.Id }, new { reader.Id });
-        } 
-        catch (Exception ex) when (ex.Message == "Conflict")
+            if (employee is null)
+            {
+                return Forbid("Employee not found");
+            }
+
+            employee.GivePermissions(context);
+
+            if (reader is null)
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                employee.RegisterReader(reader);
+                context.SaveChanges();
+
+                return CreatedAtAction(nameof(GetById), new { id = reader.Id }, new { reader.Id });
+            } 
+            catch (Exception ex) when (ex.Message == "Conflict")
+            {
+                return Conflict("There is already a reader using this email.");
+            }
+        }
+        catch (UnauthorizedAccessException)
         {
-            return Conflict("There is already a reader using this email.");
+            return Unauthorized("Token inválido ou funcionário não encontrado.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "Erro interno do servidor.");
         }
     }
 
@@ -94,34 +141,46 @@ public class ReadersController(AppDbContext context) : ControllerBase
     [HttpPut("{id}")]
     public ActionResult Update(Guid id, Reader readerData)
     {
-        var employee = _employeeRepository.GetById(Guid.Parse(_employeeId));
-
-        if (employee is null)
-        {
-            return Forbid("Employee not found");
-        }
-
-        employee.GivePermissions(context);
-
-        if (readerData is null)
-        {
-            return BadRequest();
-        }
-
         try
         {
-            employee.UpdateReader(id, readerData);
-            context.SaveChanges();
+            var employeeId = GetCurrentEmployeeId();
+            var employee = _employeeRepository.GetById(employeeId);
 
-            return NoContent();
+            if (employee is null)
+            {
+                return Forbid("Employee not found");
+            }
+
+            employee.GivePermissions(context);
+
+            if (readerData is null)
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                employee.UpdateReader(id, readerData);
+                context.SaveChanges();
+
+                return NoContent();
+            }
+            catch (Exception ex) when (ex.Message == "NotFound")
+            {
+                return NotFound("Reader not found.");
+            }
+            catch (Exception ex) when (ex.Message == "Conflict")
+            {
+                return Conflict("There is already a reader using this email.");
+            }
         }
-        catch (Exception ex) when (ex.Message == "NotFound")
+        catch (UnauthorizedAccessException)
         {
-            return NotFound("Reader not found.");
+            return Unauthorized("Token inválido ou funcionário não encontrado.");
         }
-        catch (Exception ex) when (ex.Message == "Conflict")
+        catch (Exception)
         {
-            return Conflict("There is already a reader using this email.");
+            return StatusCode(500, "Erro interno do servidor.");
         }
     }
 }

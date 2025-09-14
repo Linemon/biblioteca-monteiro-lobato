@@ -38,9 +38,15 @@
                 <button
                   type="submit"
                   class="btn btn-primary-custom w-100 py-2 rounded-custom mb-3"
+                  :disabled="loading"
                 >
-                  Entrar
+                  <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  {{ loading ? 'Entrando...' : 'Entrar' }}
                 </button>
+                
+                <div v-if="error" class="alert alert-danger rounded-custom mb-3">
+                  {{ error }}
+                </div>
                 
                 <div class="text-center">
                   <button
@@ -62,6 +68,7 @@
 
 <script>
 import { ref } from 'vue'
+import apiService from '../services/api.js'
 
 export default {
   name: 'LoginScreen',
@@ -69,16 +76,38 @@ export default {
   setup(props, { emit }) {
     const email = ref('')
     const password = ref('')
+    const loading = ref(false)
+    const error = ref('')
 
-    const handleSubmit = () => {
-      if (email.value && password.value) {
-        emit('login')
+    const handleSubmit = async () => {
+      if (!email.value || !password.value) {
+        error.value = 'Por favor, preencha todos os campos.'
+        return
+      }
+
+      loading.value = true
+      error.value = ''
+
+      try {
+        const response = await apiService.login(email.value, password.value)
+        
+        // Salvar token no localStorage
+        apiService.setToken(response.accessToken)
+        
+        // Emitir evento de login bem-sucedido
+        emit('login', response.employee)
+      } catch (err) {
+        error.value = err.message || 'Erro ao fazer login. Verifique suas credenciais.'
+      } finally {
+        loading.value = false
       }
     }
 
     return {
       email,
       password,
+      loading,
+      error,
       handleSubmit
     }
   }

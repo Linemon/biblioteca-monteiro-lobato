@@ -17,6 +17,10 @@
       
       <div class="row">
         <div class="col-12">
+          <div v-if="error" class="alert alert-danger rounded-custom mb-3">
+            {{ error }}
+          </div>
+          
           <div class="card shadow-custom rounded-custom">
             <div class="table-responsive">
               <table class="table table-hover mb-0">
@@ -24,21 +28,50 @@
                   <tr>
                     <th class="text-muted border-0 py-3">Nome</th>
                     <th class="text-muted border-0 py-3">Email</th>
+                    <th class="text-muted border-0 py-3">Telefone</th>
                     <th class="text-muted border-0 py-3">Status</th>
                     <th class="text-muted border-0 py-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="reader in mockReaders" :key="reader.id">
+                  <tr v-if="loading">
+                    <td colspan="5" class="text-center py-4">
+                      <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-else-if="readers.length === 0">
+                    <td colspan="5" class="text-center py-4 text-muted">
+                      Nenhum leitor cadastrado
+                    </td>
+                  </tr>
+                  <tr v-else v-for="reader in readers" :key="reader.id">
                     <td class="py-3">{{ reader.name }}</td>
                     <td class="py-3">{{ reader.email }}</td>
+                    <td class="py-3">{{ reader.phone }}</td>
                     <td class="py-3">
-                      <span class="badge bg-success rounded-custom">{{ reader.status }}</span>
+                      <span :class="reader.status === 'Ativo' ? 'badge bg-success' : 'badge bg-secondary'" class="rounded-custom">
+                        {{ reader.status }}
+                      </span>
                     </td>
                     <td class="py-3">
-                      <button class="btn btn-outline-secondary btn-sm rounded-custom" @click="$emit('navigate', 'reader-form', undefined, reader.id)">
-                        <i class="bi bi-pencil"></i>
-                      </button>
+                      <div class="btn-group" role="group">
+                        <button 
+                          class="btn btn-outline-primary btn-sm rounded-custom" 
+                          @click="$emit('navigate', 'reader-form', undefined, reader.id)"
+                          title="Editar"
+                        >
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button 
+                          class="btn btn-outline-danger btn-sm rounded-custom" 
+                          @click="handleDelete(reader.id)"
+                          title="Inativar"
+                        >
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -52,18 +85,80 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import apiService from '../services/api.js'
 
 export default {
   name: 'ReadersScreen',
   emits: ['navigate'],
   setup() {
-    const mockReaders = ref([
-      { id: 1, name: "João Silva", email: "joao@email.com", status: "Ativo" },
-      { id: 2, name: "Maria Santos", email: "maria@email.com", status: "Ativo" }
-    ])
-    
-    return { mockReaders }
+    const readers = ref([])
+    const loading = ref(false)
+    const error = ref('')
+
+    const loadReaders = async () => {
+      loading.value = true
+      error.value = ''
+      
+      try {
+        // Primeiro, buscar a lista de IDs dos leitores
+        const readersList = await apiService.getReaders()
+        
+        // Para cada ID, fazer um GET individual para obter os dados completos
+        const readersPromises = readersList.map(async (readerItem) => {
+          try {
+            const readerDetails = await apiService.getReaderById(readerItem.id)
+            return {
+              id: readerItem.id,
+              ...readerDetails,
+              status: readerDetails.status === 0 ? 'Ativo' : 'Inativo'
+            }
+          } catch (err) {
+            console.error(`Erro ao carregar detalhes do leitor ${readerItem.id}:`, err)
+            // Retornar dados básicos em caso de erro
+            return {
+              id: readerItem.id,
+              name: 'Erro ao carregar',
+              email: 'N/A',
+              phone: 'N/A',
+              status: 'Erro'
+            }
+          }
+        })
+        
+        // Aguardar todas as requisições individuais
+        const readersData = await Promise.all(readersPromises)
+        readers.value = readersData
+      } catch (err) {
+        error.value = err.message || 'Erro ao carregar leitores.'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const handleDelete = async (readerId) => {
+      if (!confirm('Tem certeza que deseja inativar este leitor?')) {
+        return
+      }
+
+      try {
+        await apiService.deleteReader(readerId)
+        await loadReaders() // Recarregar lista
+      } catch (err) {
+        error.value = err.message || 'Erro ao inativar leitor.'
+      }
+    }
+
+    onMounted(() => {
+      loadReaders()
+    })
+
+    return { 
+      readers, 
+      loading, 
+      error, 
+      handleDelete 
+    }
   }
 }
 </script>
